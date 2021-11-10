@@ -1,6 +1,7 @@
 package org.bouncycastle.jce.provider.test;
 
 import org.bouncycastle.crypto.engines.RSABlindingEngine;
+import org.bouncycastle.crypto.generators.RSABlindingFactorGenerator;
 import org.bouncycastle.crypto.params.RSABlindingParameters;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -52,7 +53,7 @@ public class RSABlindNoPaddingTest extends SimpleTest {
         PublicKey pubKey = fact.generatePublic(pubKeySpec);
         RSAKeyParameters keyParameters = new RSAKeyParameters(false, pubKeySpec.getModulus(), pubKeySpec.getPublicExponent());
 
-        // encryption
+        // encrypt
         Cipher enCipher = Cipher.getInstance("RSA/ECB/NoPadding", "BC");
         enCipher.init(Cipher.ENCRYPT_MODE, pubKey);
         byte[] ciphertext = enCipher.doFinal(plaintext);
@@ -60,13 +61,16 @@ public class RSABlindNoPaddingTest extends SimpleTest {
         System.out.println("cipher: " + Arrays.toString(cipherInteger.toByteArray()));
 
         // blind
-        BigInteger r = new BigInteger("9187672208884584551578626597721077350571447838464860772294562561142651027527325047236339031520048141566779774610930475");
+        RSABlindingFactorGenerator rsaBlindingFactorGenerator = new RSABlindingFactorGenerator();
+        rsaBlindingFactorGenerator.init(keyParameters);
+        BigInteger r = rsaBlindingFactorGenerator.generateBlindingFactor();
+
         RSABlindingEngine blindingEngine = new RSABlindingEngine();
         blindingEngine.init(true, new RSABlindingParameters(keyParameters, r));
         byte[] blindedInput =  blindingEngine.processBlock(ciphertext, 0, ciphertext.length);
         System.out.println("blind: " + Arrays.toString(blindedInput));
 
-        // raw decrypt
+        // decrypt
         Cipher deCipher = Cipher.getInstance("RSA/ECB/NoPadding", "BC");
         deCipher.init(Cipher.DECRYPT_MODE, privKey);
         byte[] decrypted = deCipher.doFinal(blindedInput);
@@ -75,11 +79,11 @@ public class RSABlindNoPaddingTest extends SimpleTest {
         // un blind
         RSABlindingEngine unBlindingEngine = new RSABlindingEngine();
         unBlindingEngine.init(false, new RSABlindingParameters(keyParameters, r));
-        byte[] un_blind = unBlindingEngine.processBlock(decrypted, 0, decrypted.length);
-        System.out.println("unblind: " + Arrays.toString(un_blind));
+        byte[] unBlind = unBlindingEngine.processBlock(decrypted, 0, decrypted.length);
+        System.out.println("unblind: " + Arrays.toString(unBlind));
         System.out.println("message: " + Arrays.toString(plaintext));
 
-        if (!areEqual(un_blind, plaintext))
+        if (!areEqual(unBlind, plaintext))
         {
             fail("Blinding process failed");
         }
